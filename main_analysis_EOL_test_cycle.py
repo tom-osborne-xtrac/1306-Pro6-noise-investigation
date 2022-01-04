@@ -6,9 +6,90 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 
+
+"""
+List of available channels: - 
+Time Into Test
+Event Time
+OP Speed 1
+OP Torque 1
+OP Speed 2
+OP Torque 2
+IP Speed 1
+IP Torque 1
+GBox T1
+GBox T2
+GBox T3
+[V2] Pressure GBX out
+[V3] Pressure Filter out
+[V4] Temperature GBX out
+[V5] Temperature Filter out
+[V9] Pri. GBox Oil Temp
+[P1] Pri.Gbox Press
+Raw Oil Flow
+Avg Oil Flow
+Oil Flow Revs
+TCM_CluPosnRel
+TCM_DrvModReqd
+TCM_GearActv
+TCM_CluSts
+TCM CluPosnBas
+TCM_ClutchFault
+TCM_CluSlipSts
+TCM_CluTqDes
+TCM_GearTar
+TCM_GearActtnActv
+TCM_GearEngd
+TCM_CluTqTrf
+TCM_TqEstimd
+TCM_CluTqCalcd
+TCM_ClutchTrq
+TCM_GearActuatorFault
+TCM_FaultReaction1
+TCM_FaultReaction2
+TCM_ClutchFault
+TCM_BSW_ElecFault
+TCM_SysPLow
+TCM_ClutchOpenTime
+TCM_ClutchOverTemp
+TCM_ClutchHighTemp
+TCM_HydOilOverTemp
+TCM_LubPOutOfRange
+TCM_SumpOilOverTemp
+TCM_SumpOilHighTemp
+TCM_CDS_triggered
+TCM_FaultState
+TCM GearActr1PosnBas
+TCM GearActr2PosnBas
+TCM GearActr3PosnBas
+TCM GearActr4PosnBas
+TCM_TC0FctSt
+TCM CluPosnBas
+TCM_GearEngd
+TCM_GLBFct_St
+TCM OutShaftNBas
+TCM MaiShaftNBas
+TCM InShaftNBas
+TCM ClushaftNBas
+TCM_FaultState_TCM
+TCM_OilPmpEnaDutyCycOutp
+TCM_OilPmpEnaPerdOutp
+TCM_SysPBas
+TCM_HydoilTBas
+1306 Oil In - TCM_SumpoilTBas
+1306 Oil Out - TCM_Sumpoil2TBas
+AxleTorque
+LockingTorque
+OPSpeedDelta
+"""
+
+
 def get_data(path=''):
-    # Define filePath
-    # ---------------------- #
+    """
+    Defines the file path for analysis.
+    File path can be passed as variable or left blank.
+    If left blank, the function will open a file dialog allowing user to select a file
+    """
     if(path == ''):
         root = tk.Tk()
         root.withdraw()
@@ -29,7 +110,24 @@ def get_data(path=''):
     return df, file_path, file_dir, file_name
 
 
+def add_calculated_channels(data):
+    """
+    Adds calculated channels to the dataframe
+    """
+    # Calculated Channels
+    # ------------------
+    sr = calc_sample_rate(data)
+    data['AxleTorque'] = data['OP Torque 1'] + data['OP Torque 2']
+    data['LockingTorque'] = data['OP Torque 1'] - data['OP Torque 2']
+    data['OPSpeedDelta'] = data['OP Speed 1'] - data['OP Speed 2']
+
+    return data, sr
+
+
 def set_axis(plots, axis, label, start, end, major, minor):
+    """
+    Function for setting plot label, axis major and minor ticks and formats the gridlines
+    """
     for plot in plots:
         if major:
             major_ticks = np.arange(start, end + 1, major)
@@ -56,6 +154,10 @@ def set_axis(plots, axis, label, start, end, major, minor):
 
 
 def set_start(data):
+    """
+    Finds the start of the EoL test run and removes data beforehand. 
+    Adjusts 'Event Time' channel to 0s at start
+    """
     # File 1
     EoL_start_1 = np.argwhere(np.array(data['IP Speed 1']) < 10).flatten().tolist()
     EoL_start_1 = [i for i in EoL_start_1 if i != 0]
@@ -74,25 +176,37 @@ def set_start(data):
     return data
 
 
-def find_points(file):
+def find_points(file, sample_rate):
+    """
+    Finds a start and end index for each 
+    speed step with a 5s buffer form ramped sections
+    """
     max_idx = sorted(np.argwhere(np.array(file['IP Speed 1']) > 5995).flatten().tolist())[-1]
     points = []
     for i in range(6):
         step_temp = np.argwhere(np.array(file.loc[0:max_idx, 'IP Speed 1']) > (i+1) * 950).flatten().tolist()
         step_temp_2 = np.argwhere(np.array(file.loc[0:max_idx, 'IP Speed 1']) < (i+1) * 1000 + 350).flatten().tolist()
         step_temp_sort = sorted(list(set(step_temp).intersection(step_temp_2)))
-        points.append(step_temp_sort[1] + (int(sample_rate1) * 5))
-        points.append(step_temp_sort[-1] - (int(sample_rate1) * 5))
+        points.append(step_temp_sort[1] + (int(sample_rate) * 5))
+        points.append(step_temp_sort[-1] - (int(sample_rate) * 5))
 
     points_grouped = (list(zip(points[::2], points[1::2])))
     return points, points_grouped
 
 
 def calc_sample_rate(data):
+    """
+    Calculates the sample rate from a given dataset
+    """
     return round(1 / data['Event Time'].diff().mean().values[0], 1)
 
 
 def generate_plotting_data(data, points):
+    """
+    Uses the start and end points found in the find_points() function to extract the data and
+    calculate averages for each section.
+    Returns a dataframe with averages of all channels for each speed step
+    """
     extracted_data = []
     for point in points:
         start = point[0]
@@ -100,6 +214,9 @@ def generate_plotting_data(data, points):
         extracted_data.append(pd.DataFrame(data.loc[start:end].mean().to_dict(),index=[data.index.values[-1]]))
     return pd.concat(extracted_data)
 
+
+#  Open Files
+# -----------------------
 # raw_data, fpath, fdir, fname = get_data(
 #     '//DSUK01/Company Shared Documents/Projects/1306/XT REPORTS'
 #     '/XT-14972 - PRO6 Noise Investigation/R&D testing/1306-027'
@@ -112,34 +229,29 @@ def generate_plotting_data(data, points):
 #     '/2021-12-21 - 1306-027/1306-027_EOL_TEST_Run3'
 #     '/Trace 01335 21 12 2021 15_35_39.&11_001.CSV'
 #     )
+
 raw_data, fpath, fdir, fname = get_data()
 raw_data2, fpath2, fdir2, fname2 = get_data()
+
+
 foutput = f'{fdir}/{fname}.png'
 foutput2 = f'{fdir2}/{fname2}.png'
 figsize = (16, 9)
 
-# Calculated Channels
-# ------------------
-sample_rate1 = calc_sample_rate(raw_data)
-sample_rate2 = calc_sample_rate(raw_data2)
-
-raw_data['AxleTorque'] = raw_data['OP Torque 1'] + raw_data['OP Torque 2']
-raw_data2['AxleTorque'] = raw_data2['OP Torque 1'] + raw_data2['OP Torque 2']
-
-raw_data['LockingTorque'] = raw_data['OP Torque 1'] - raw_data['OP Torque 2']
-raw_data2['LockingTorque'] = raw_data2['OP Torque 1'] - raw_data2['OP Torque 2']
-
-raw_data['OPSpeedDelta'] = raw_data['OP Speed 1'] - raw_data['OP Speed 2']
-raw_data2['OPSpeedDelta'] = raw_data2['OP Speed 1'] - raw_data2['OP Speed 2']
+raw_data, sr = add_calculated_channels(raw_data)
+raw_data2, sr2 = add_calculated_channels(raw_data2)
 
 # Set starting position
 # ------------------
 raw_data = set_start(raw_data)
 raw_data2 = set_start(raw_data2)
 
+# Prints a list of column headers (channel names) - useful for adding new channels to plots
+# print('\n'.join([tuple[0] for tuple in raw_data.columns.values]))
+
 # Find points
-points, points_grouped = find_points(raw_data)
-points2, points_grouped2 = find_points(raw_data2)
+points, points_grouped = find_points(raw_data, sr)
+points2, points_grouped2 = find_points(raw_data2, sr2)
 
 plotting_data = generate_plotting_data(raw_data, points_grouped)
 plotting_data2 = generate_plotting_data(raw_data2, points_grouped2)
@@ -297,7 +409,7 @@ ax2[0, 0].plot(
     marker='o'
 )
 ax2[0, 0].set_title("IP Torque Comparison", loc='left')
-ax2[0, 0].legend(loc=1, facecolor="white")
+ax2[0, 0].legend(loc=2, facecolor="white")
 set_axis([ax2[0, 0]], 'y', 'Torque [Nm]', 0, 30, 10, 2)
 
 # Plot 2 - Oil Flow
@@ -316,7 +428,7 @@ ax2[0, 1].plot(
     marker='o'
 )
 ax2[0, 1].set_title("Oil Flow Rate Comparison", loc='left')
-ax2[0, 1].legend(loc=1, facecolor="white")
+ax2[0, 1].legend(loc=2, facecolor="white")
 set_axis([ax2[0, 1]], 'y', 'Oil Flow Rate [L/min]', 0, 20, 2, 1)
 
 # Plot 3 - Oil Pressure
@@ -335,7 +447,7 @@ ax2[1, 0].plot(
     marker='o'
 )
 ax2[1, 0].set_title("Oil Pressure Comparison", loc='left')
-ax2[1, 0].legend(loc=1, facecolor="white")
+ax2[1, 0].legend(loc=2, facecolor="white")
 set_axis([ax2[1, 0]], 'y', 'Oil Pressure [bar]', 0, 3, 0.5, 0.25)
 
 # Plot 4 - Oil Temperature
@@ -353,9 +465,39 @@ ax2[1, 1].plot(
     label=f'{fname2}: Oil Temperature [degC]',
     marker='o'
 )
-ax2[1, 1].set_title("Oil  Temperature Comparison", loc='left')
-ax2[1, 1].legend(loc=1, facecolor="white")
-set_axis([ax2[1, 1]], 'y', 'Oil  Temperature [degC]', 20, 100, 10, 2.5)
+ax2[1, 1].plot(
+    plotting_data['IP Speed 1'],
+    plotting_data['GBox T2'],
+    color="blue",
+    label=f'{fname}: RH Flange Temp [degC]',
+    marker='o'
+)
+ax2[1, 1].plot(
+    plotting_data2['IP Speed 1'],
+    plotting_data2['GBox T2'],
+    color="deepskyblue",
+    label=f'{fname2}: RH Flange Temp [degC]',
+    marker='o'
+)
+ax2[1, 1].plot(
+    plotting_data['IP Speed 1'],
+    plotting_data['GBox T3'],
+    color="red",
+    label=f'{fname}: LH Flange Temp [degC]',
+    marker='o',
+    linestyle='--'
+)
+ax2[1, 1].plot(
+    plotting_data2['IP Speed 1'],
+    plotting_data2['GBox T3'],
+    color="orange",
+    label=f'{fname2}: LH Flange Temp [degC]',
+    marker='o',
+    linestyle='--'
+)
+ax2[1, 1].set_title("Oil & OP Flange Temperature Comparison", loc='left')
+ax2[1, 1].legend(loc=2, facecolor="white")
+set_axis([ax2[1, 1]], 'y', 'Temperature [degC]', 20, 100, 10, 2.5)
 
 for axs in ax2:
     set_axis(axs, 'x', 'IP Speed [rpm]', 0, 8000, 1000, 200)

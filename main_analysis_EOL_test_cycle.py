@@ -215,6 +215,16 @@ def generate_plotting_data(data, points):
     return pd.concat(extracted_data)
 
 
+def plot_channel(data, file_name, axis, y_channel, colour, label):
+    axis.plot(
+    data['Event Time'],
+    data[y_channel],
+    color=colour,
+    label=f'{file_name}: {label}',
+    marker=None
+)
+
+
 #  Open Files
 # -----------------------
 # raw_data, fpath, fdir, fname = get_data(
@@ -230,27 +240,30 @@ def generate_plotting_data(data, points):
 #     '/Trace 01335 21 12 2021 15_35_39.&11_001.CSV'
 #     )
 
-raw_data, fpath, fdir, fname = get_data()
-raw_data2, fpath2, fdir2, fname2 = get_data()
+# raw_data, fpath, fdir, fname = get_data()
+# raw_data2, fpath2, fdir2, fname2 = get_data()
 
-foutput = f'{fdir}/{fname}.png'
-foutput2 = f'{fdir2}/{fname2}.png'
+raw_data = []
+raw_data.append(get_data())
+raw_data.append(get_data())
+
+foutput = []
+for rdata, fpath, fdir, fname in raw_data:
+    foutput.append(f'{fdir}/{fname}.png')
+
+    rdata, sr = add_calculated_channels(rdata)
+    rdata = set_start(rdata)
+    points, points_grouped = find_points(rdata, sr)
+
 figsize = (16, 9)
 
-raw_data, sr = add_calculated_channels(raw_data)
-raw_data2, sr2 = add_calculated_channels(raw_data2)
 
-# Set starting position
-# ------------------
-raw_data = set_start(raw_data)
-raw_data2 = set_start(raw_data2)
 
 # Prints a list of column headers (channel names) - useful for adding new channels to plots
 # print('\n'.join([tuple[0] for tuple in raw_data.columns.values]))
 
 # Find points
 points, points_grouped = find_points(raw_data, sr)
-points2, points_grouped2 = find_points(raw_data2, sr2)
 
 plotting_data = generate_plotting_data(raw_data, points_grouped)
 plotting_data2 = generate_plotting_data(raw_data2, points_grouped2)
@@ -266,20 +279,23 @@ set_axis(ax, 'x', 'Time [s]', 0, xlim, xmaj, xminor)
 # Plot 1
 # ------------------
 axSecondary = ax[0].twinx()
-axSecondary.plot(
-    raw_data['Event Time'],
-    raw_data['[V9] Pri. GBox Oil Temp'],
-    color="green",
-    label=f'{fname}: Oil Temperature [degC]',
-    marker=None
-)
-axSecondary.plot(
-    raw_data2['Event Time'],
-    raw_data2['[V9] Pri. GBox Oil Temp'],
-    color="lime",
-    label=f'{fname2}: Oil Temperature [degC]',
-    marker=None
-)
+
+plot_channel(raw_data, fname, axSecondary, '[V9] Pri. GBox Oil Temp', 'green', 'Oil Temperature [degC]')
+plot_channel(raw_data2, fname2, axSecondary, '[V9] Pri. GBox Oil Temp', 'green', 'Oil Temperature [degC]')
+# axSecondary.plot(
+#     raw_data['Event Time'],
+#     raw_data['[V9] Pri. GBox Oil Temp'],
+#     color="green",
+#     label=f'{fname}: Oil Temperature [degC]',
+#     marker=None
+# )
+# axSecondary.plot(
+#     raw_data2['Event Time'],
+#     raw_data2['[V9] Pri. GBox Oil Temp'],
+#     color="lime",
+#     label=f'{fname2}: Oil Temperature [degC]',
+#     marker=None
+# )
 set_axis([axSecondary], 'y', 'Temperature [degC]', 20, 70, 5, 2.5)
 
 ax[0].plot(

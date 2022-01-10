@@ -233,7 +233,6 @@ def generate_plotting_data(data, points):
 raw_data, fpath, fdir, fname = get_data()
 raw_data2, fpath2, fdir2, fname2 = get_data()
 
-
 foutput = f'{fdir}/{fname}.png'
 foutput2 = f'{fdir2}/{fname2}.png'
 figsize = (16, 9)

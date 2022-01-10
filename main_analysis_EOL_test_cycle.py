@@ -216,7 +216,7 @@ def generate_plotting_data(data, points):
 
 
 def plot_channel(data, file_name, axis, y_channel, label):
-    print('plot_channel')
+    print(f'Plotting {y_channel}')
     axis.plot(
         data['Event Time'],
         data[y_channel],
@@ -226,14 +226,23 @@ def plot_channel(data, file_name, axis, y_channel, label):
     )
 
 
-def plot_points(data, file_name, axis, y_channel, points):
-    print('plot_channel')
-    axis.plot(
-        data['Event Time'].iloc[points],
-        data[y_channel].iloc[points],
-        'o',
-        linestyle = 'None'
-    )
+def plot_points(data, axis, y_channel, points=''):
+    print(f'Plotting {y_channel}')
+    if points == '':
+        axis.plot(
+            data['Event Time'],
+            data[y_channel],
+            'o',
+            linestyle = 'None'
+        )
+    else:
+        axis.plot(
+            data['Event Time'].iloc[points],
+            data[y_channel].iloc[points],
+            'o',
+            linestyle = 'None'
+        )
+
 
 
 #  Open Files
@@ -263,6 +272,10 @@ raw_data.append(get_data('//DSUK01/Company Shared Documents/Projects/1306/XT REP
     '/XT-14972 - PRO6 Noise Investigation/R&D testing/1306-027'
     '/2021-12-21 - 1306-027/1306-027_EOL_TEST_Run3'
     '/Trace 01335 21 12 2021 15_35_39.&11_001.CSV'))
+raw_data.append(get_data('//DSUK01/Company Shared Documents/Projects/1306/XT REPORTS'
+    '/XT-14972 - PRO6 Noise Investigation/R&D testing/1306-027'
+    '/2022-01-04 - 1306-027/1306-027_EOL TEST_Run5'
+    '/Trace 01356 04 01 2022 18_26_02.&1L_001.CSV'))
 
 
 # Figure 1 - Summary plot
@@ -277,6 +290,8 @@ set_axis(ax, 'x', 'Time [s]', 0, xlim, xmaj, xminor)
 axSecondary = ax[0].twinx()
 set_axis([axSecondary], 'y', 'Temperature [degC]', 20, 70, 5, 2.5)
 
+fig2, ax2 = plt.subplots(2, 2, figsize=figsize)
+
 foutput = []
 plotting_data = []
 
@@ -286,14 +301,20 @@ for rdata, fpath, fdir, fname in raw_data:
     rdata, sr = add_calculated_channels(rdata)
     rdata = set_start(rdata)
     points, points_grouped = find_points(rdata, sr)
-    plotting_data.append(generate_plotting_data(rdata, points_grouped))
+    plotting_data = generate_plotting_data(rdata, points_grouped)
 
+    # Plot 1 - IP Speed & Temperature
     plot_channel(rdata, fname, axSecondary, '[V9] Pri. GBox Oil Temp', 'Oil Temperature [degC]')
     plot_channel(rdata, fname, ax[0], 'IP Speed 1', 'Input Speed [rpm]')
-    plot_points(rdata, fname, ax[0], 'IP Speed 1', points)
+    plot_points(rdata, ax[0], 'IP Speed 1', points)
+    plot_points(plotting_data, ax[0], 'IP Speed 1')
 
+    # Plot 2 - IP Torque
     plot_channel(rdata, fname, ax[1], 'IP Torque 1', 'Input Speed [rpm]')
+    plot_points(plotting_data, ax[1], 'IP Torque 1')
 
+    # Plot 3
+    plot_channel(rdata, fname, ax[2], 'AxleTorque', 'Axle Torque [Nm]')
 
 
 
@@ -431,7 +452,7 @@ set_axis([ax[1]], 'y', 'Torque [Nm]', 0, 30, 10, 2)
 #     marker=None
 # )
 ax[2].set_title("Axle Torque (LH + RH)", loc='left')
-ax[2].legend(loc=1, facecolor="white")
+# ax[2].legend(loc=1, facecolor="white")
 set_axis([ax[2]], 'y', 'Torque [Nm]', 0, 30, 10, 2)
 
 fig.suptitle(f'{fdir}', fontsize=10)
